@@ -38,3 +38,33 @@ Learning gender is essential because it affects adjectives, verbs, and agreement
    ```bash
    git clone git@github.com:your-username/ukrainian-gender-quiz.git
    cd ukrainian-gender-quiz
+
+2. Open in XCODE:
+   ''bash
+   open Ukrainian.xcodeproj
+
+3. Connect your iphone and press the Run button in XCode.
+
+## Roadmap
+- 📊 End-of-session summary (words missed, accuracy %)
+- 🎯 Streaks & daily goals
+- 🌙 Light/Dark mode with Ukrainian accent colors
+- 🌍 Categories (family, food, animals, travel)
+- 🔔 Notifications for daily practice
+
+## License
+Currently closed-source for personal development and personal use. May switch to MIT or Apache 2.0 in the future.
+
+## Authorship
+Developed by Eric Adams with AI assistance for SwiftUI conversion.
+Originally inspired by a Python flashcard script.
+
+
+---
+
+👉 Save this as `README.md` in your project folder, then in Terminal:
+
+```bash
+git add README.md
+git commit -m "Add project README"
+git push
