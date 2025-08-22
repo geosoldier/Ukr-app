@@ -30,7 +30,7 @@ Learning gender is essential because it affects adjectives, verbs, and agreement
 ## 🚀 Getting Started
 ### Requirements
 - macOS with **Xcode 15+**
-- iPhone running iOS 17+ (tested on iPhone 15 Pro Max)
+- iPhone running iOS 17+ (tested on iPhone 14 Pro Max)
 - SwiftUI project template
 
 ### Build & Run
