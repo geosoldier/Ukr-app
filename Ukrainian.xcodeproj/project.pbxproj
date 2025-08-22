@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		73EA81E02E57ABBE00FFC9A2 /* EricsUKRApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73EA81DF2E57AA2200FFC9A2 /* EricsUKRApp.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		73EA81C32E57A58F00FFC9A2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,25 +31,8 @@
 		73EA81B52E57A58D00FFC9A2 /* Ukrainian.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ukrainian.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		73EA81C22E57A58F00FFC9A2 /* UkrainianTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UkrainianTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		73EA81CC2E57A58F00FFC9A2 /* UkrainianUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = UkrainianUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		73EA81DF2E57AA2200FFC9A2 /* EricsUKRApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EricsUKRApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		73EA81B72E57A58D00FFC9A2 /* Ukrainian */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Ukrainian;
-			sourceTree = "<group>";
-		};
-		73EA81C52E57A58F00FFC9A2 /* UkrainianTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = UkrainianTests;
-			sourceTree = "<group>";
-		};
-		73EA81CF2E57A58F00FFC9A2 /* UkrainianUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = UkrainianUITests;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		73EA81B22E57A58D00FFC9A2 /* Frameworks */ = {
@@ -75,9 +62,7 @@
 		73EA81AC2E57A58D00FFC9A2 = {
 			isa = PBXGroup;
 			children = (
-				73EA81B72E57A58D00FFC9A2 /* Ukrainian */,
-				73EA81C52E57A58F00FFC9A2 /* UkrainianTests */,
-				73EA81CF2E57A58F00FFC9A2 /* UkrainianUITests */,
+				73EA81DF2E57AA2200FFC9A2 /* EricsUKRApp.swift */,
 				73EA81B62E57A58D00FFC9A2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -107,9 +92,6 @@
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				73EA81B72E57A58D00FFC9A2 /* Ukrainian */,
-			);
 			name = Ukrainian;
 			packageProductDependencies = (
 			);
@@ -130,9 +112,6 @@
 			dependencies = (
 				73EA81C42E57A58F00FFC9A2 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				73EA81C52E57A58F00FFC9A2 /* UkrainianTests */,
-			);
 			name = UkrainianTests;
 			packageProductDependencies = (
 			);
@@ -152,9 +131,6 @@
 			);
 			dependencies = (
 				73EA81CE2E57A58F00FFC9A2 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				73EA81CF2E57A58F00FFC9A2 /* UkrainianUITests */,
 			);
 			name = UkrainianUITests;
 			packageProductDependencies = (
@@ -236,6 +212,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				73EA81E02E57ABBE00FFC9A2 /* EricsUKRApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -395,6 +372,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 663TZV6ZN2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -407,7 +385,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = eric.Ukrainian;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericadams.ukrainianqquiz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -422,6 +400,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 663TZV6ZN2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -434,7 +413,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = eric.Ukrainian;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ericadams.ukrainianqquiz;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
