@@ -37,6 +37,7 @@ struct QuizSettings {
     @AppStorage("hapticsEnabled") var hapticsEnabled: Bool = true
     @AppStorage("shuffleEnabled") var shuffleEnabled: Bool = true
     @AppStorage("activeCategories") var activeCategoriesRaw: String = "" // CSV
+    @AppStorage("sessionLength") var sessionLength: Int = 20  // 10, 20, 50, or 0 for All
 
     // TTS
     @AppStorage("speechEnabled") var speechEnabled: Bool = true
@@ -250,7 +251,15 @@ final class QuizViewModel: ObservableObject {
         if !selected.isEmpty {
             deck = deck.filter { !$0.categories.isEmpty && !selected.isDisjoint(with: Set($0.categories)) }
         }
-        workingDeck = settings.shuffleEnabled ? deck.shuffled() : deck
+        deck = settings.shuffleEnabled ? deck.shuffled() : deck
+
+        // NEW: enforce session length
+        let limit = settings.sessionLength  // 10 / 20 / 50 / 0 (All)
+        if limit > 0, deck.count > limit {
+            workingDeck = Array(deck.prefix(limit))
+        } else {
+            workingDeck = deck
+        }
 
         currentIndex = 0
         backHistory.removeAll()
@@ -521,6 +530,27 @@ struct SettingsView: View {
                     }
                 }
 
+                Section(header: Text("Session Length")) {
+                    Picker("Number of words", selection: $vm.settings.sessionLength) {
+                        Text("10").tag(10)
+                        Text("20").tag(20)
+                        Text("50").tag(50)
+                        Text("All").tag(0)   // 0 means no limit
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(vm.settings.sessionLength == 0
+                         ? "Practice with all available words."
+                         : "Practice with \(vm.settings.sessionLength) words per session.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+
+                    Button("Apply to current deck") {
+                        vm.rebuildWorkingDeck()
+                        vm.ensureStateAndStart()
+                    }
+                }
+                
                 Section(header: Text("Deck Behavior")) {
                     Toggle("Shuffle deck", isOn: $vm.settings.shuffleEnabled)
                         .onChange(of: vm.settings.shuffleEnabled) {
