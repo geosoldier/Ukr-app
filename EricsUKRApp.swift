@@ -33,7 +33,7 @@ enum AudioSetup {
         }
     }
 }
-
+// this is a test string from Cursor. If it reflects in the app, then Cursor is working.
 
 // Per-card UI/score state so going back doesn’t double-score
 struct CardState: Equatable {
