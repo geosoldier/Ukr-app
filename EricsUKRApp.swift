@@ -21,6 +21,20 @@ struct VocabItem: Identifiable, Equatable {
 }
 enum QuizPhase { case meaning, gender, done }
 
+enum AudioSetup {
+    static func configureForTTS() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            // .playback overrides the mute/silent switch
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true, options: [])
+        } catch {
+            print("Audio session error: \(error)")
+        }
+    }
+}
+
+
 // Per-card UI/score state so going back doesn’t double-score
 struct CardState: Equatable {
     var selectedMeaning: String? = nil
@@ -36,12 +50,13 @@ struct CardState: Equatable {
 struct QuizSettings {
     @AppStorage("hapticsEnabled") var hapticsEnabled: Bool = true
     @AppStorage("shuffleEnabled") var shuffleEnabled: Bool = true
-    @AppStorage("activeCategories") var activeCategoriesRaw: String = "" // CSV
-    @AppStorage("sessionLength") var sessionLength: Int = 20  // 10, 20, 50, or 0 for All
+
+    // Session
+    @AppStorage("sessionLength") var sessionLength: Int = 20  // 10/20/50 or 0=All
 
     // TTS
     @AppStorage("speechEnabled") var speechEnabled: Bool = true
-    @AppStorage("speechRate") var speechRate: Double = 0.5 // 0.2...0.9 UI range
+    @AppStorage("speechRate") var speechRate: Double = 0.5
 
     // Sounds
     @AppStorage("answerSoundsEnabled") var answerSoundsEnabled: Bool = true
@@ -49,15 +64,8 @@ struct QuizSettings {
     // UI
     @AppStorage("showInstructions") var showInstructions: Bool = true
     @AppStorage("hasSeenWelcome") var hasSeenWelcome: Bool = false
-
-    var activeCategories: Set<String> {
-        get {
-            let trimmed = activeCategoriesRaw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-            return Set(trimmed.filter { !$0.isEmpty })
-        }
-        set { activeCategoriesRaw = newValue.sorted().joined(separator: ",") }
-    }
 }
+
 
 // MARK: - Haptics & Sounds
 struct Haptics {
@@ -107,6 +115,10 @@ final class QuizViewModel: ObservableObject {
     @Published var meaningOptions: [String] = []
     @Published var selectedMeaning: String? = nil
     @Published var selectedGender: String? = nil
+    @Published var showSummary: Bool = false
+    @Published var missedItems: [VocabItem] = []
+    @Published var activeCategories: Set<String> = []
+
 
     // Per-card saved state
     private var stateByID: [UUID: CardState] = [:]
@@ -123,6 +135,7 @@ final class QuizViewModel: ObservableObject {
 
     init() {
         loadWords()
+        loadPersistedCategories()
         rebuildWorkingDeck()
         ensureStateAndStart()
     }
@@ -247,7 +260,7 @@ final class QuizViewModel: ObservableObject {
 
     func rebuildWorkingDeck() {
         var deck = fullDeck
-        let selected = settings.activeCategories
+        let selected = activeCategories
         if !selected.isEmpty {
             deck = deck.filter { !$0.categories.isEmpty && !selected.isDisjoint(with: Set($0.categories)) }
         }
@@ -266,6 +279,9 @@ final class QuizViewModel: ObservableObject {
         stateByID.removeAll()
         score = 0
         totalAsked = 0
+        showSummary = false
+        missedItems = []
+        ensureStateAndStart()
     }
 
     // Public so SettingsView can call it
@@ -353,6 +369,16 @@ final class QuizViewModel: ObservableObject {
             }
             if st.phase != .done { totalAsked += 1 }
             st.phase = .done
+            // Record as missed if either meaning or gender was wrong
+            let wasMeaningCorrect = st.meaningWasCorrect ?? false
+            let wasGenderCorrect  = st.genderWasCorrect ?? false
+            if !(wasMeaningCorrect && wasGenderCorrect), let cur = current {
+                // avoid duplicates if somehow revisiting
+                if !missedItems.contains(where: { $0.id == cur.id }) {
+                    missedItems.append(cur)
+                }
+            }
+
         }
         restoreStateToUI()
     }
@@ -365,7 +391,8 @@ final class QuizViewModel: ObservableObject {
         if currentIndex + 1 < workingDeck.count {
             currentIndex += 1
         } else {
-            rebuildWorkingDeck()
+            // End of session -> show summary instead of auto-rebuilding
+            showSummary = true
         }
         if let id = current?.id, stateByID[id] == nil { stateByID[id] = CardState() }
         restoreStateToUI()
@@ -399,6 +426,62 @@ final class QuizViewModel: ObservableObject {
         guard let w = current?.word else { return }
         SpeechManager.shared.speak(w, enabled: settings.speechEnabled, rate: settings.speechRate)
     }
+    
+    // Save and load categories from UserDefaults
+    // MARK: - Category persistence
+    private let categoriesKey = "activeCategories" // UserDefaults key
+
+    func persistCategories() {
+        UserDefaults.standard.set(Array(activeCategories), forKey: categoriesKey)
+    }
+
+    func loadPersistedCategories() {
+        if let saved = UserDefaults.standard.stringArray(forKey: categoriesKey) {
+            activeCategories = Set(saved)
+        }
+    }
+
+
+    func toggleCategory(_ cat: String) {
+        if activeCategories.contains(cat) {
+            activeCategories.remove(cat)
+        } else {
+            activeCategories.insert(cat)
+        }
+        persistCategories()
+        rebuildWorkingDeck()
+        ensureStateAndStart()
+    }
+
+    
+    // =========================
+    // ✅ ADDITIONS FOR SUMMARY:
+    // =========================
+    
+    /// Rebuild the deck from only the missed items and start a fresh session
+    func retryMissedOnly() {
+        guard !missedItems.isEmpty else {
+            showSummary = false
+            return
+        }
+        workingDeck = missedItems.shuffled()
+        currentIndex = 0
+        backHistory.removeAll()
+        stateByID.removeAll()
+        score = 0
+        totalAsked = 0
+        missedItems.removeAll()
+        showSummary = false
+        ensureStateAndStart()
+    }
+
+    /// Start a new full session using current filters and session length
+    func startNewSessionFromFilters() {
+        rebuildWorkingDeck()
+        showSummary = false
+        ensureStateAndStart()
+    }
+
 }
 
 // MARK: - Welcome / Gender Guide
@@ -488,6 +571,7 @@ struct WelcomeView: View {
 }
 
 // MARK: - Settings UI
+// MARK: - Settings UI
 struct SettingsView: View {
     @ObservedObject var vm: QuizViewModel
     @Environment(\.dismiss) var dismiss
@@ -496,15 +580,18 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
+                // Intro strip
                 Section {
-                    // Flag header strip
                     HStack(spacing: 0) { AppTheme.flagBlue; AppTheme.flagYellow }
-                        .frame(height: 6).mask(RoundedRectangle(cornerRadius: 6))
+                        .frame(height: 6)
+                        .mask(RoundedRectangle(cornerRadius: 6))
                         .padding(.vertical, 6)
                     Text("Customize your practice and learn how the app works.")
-                        .font(.subheadline).foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
 
+                // Instructions
                 Section(header: Text("Instructions")) {
                     Toggle("Show quick instructions", isOn: $vm.settings.showInstructions)
                     Button {
@@ -514,6 +601,7 @@ struct SettingsView: View {
                     }
                 }
 
+                // Feedback (haptics/sounds/tts)
                 Section(header: Text("Feedback")) {
                     Toggle("Haptics (ding/buzz feel)", isOn: $vm.settings.hapticsEnabled)
                     Toggle("Answer sounds", isOn: $vm.settings.answerSoundsEnabled)
@@ -530,6 +618,7 @@ struct SettingsView: View {
                     }
                 }
 
+                // Session length
                 Section(header: Text("Session Length")) {
                     Picker("Number of words", selection: $vm.settings.sessionLength) {
                         Text("10").tag(10)
@@ -550,7 +639,8 @@ struct SettingsView: View {
                         vm.ensureStateAndStart()
                     }
                 }
-                
+
+                // Deck behavior
                 Section(header: Text("Deck Behavior")) {
                     Toggle("Shuffle deck", isOn: $vm.settings.shuffleEnabled)
                         .onChange(of: vm.settings.shuffleEnabled) {
@@ -559,21 +649,28 @@ struct SettingsView: View {
                         }
                 }
 
-                Section(header: Text("Categories")) {
-                    CategoryGrid(vm: vm)
-                }
-
-                if !vm.settings.activeCategories.isEmpty {
-                    Section(header: Text("Active Filters")) {
-                        Text(vm.settings.activeCategories.sorted().joined(separator: ", "))
+                // Active filters (ALWAYS render the Section; gate the content)
+                Section(header: Text("Active Filters")) {
+                    if vm.activeCategories.isEmpty {
+                        Text(vm.activeCategories.sorted().joined(separator: ", "))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(vm.activeCategories.sorted().joined(separator: ", "))
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                 }
+
+                // Categories grid
+                Section(header: Text("Categories")) {
+                    CategoryGrid(vm: vm)
+                }
             }
             .navigationTitle("Settings")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Apply") {
                         vm.rebuildWorkingDeck()
@@ -584,46 +681,175 @@ struct SettingsView: View {
             }
         }
         .sheet(isPresented: $showWelcome) {
-            WelcomeView {
-                showWelcome = false
-            }
-            .presentationDetents([.large])
+            WelcomeView { showWelcome = false }
+                .presentationDetents([.large])
         }
+    }
+}
+
+// MARK: - Session Summary UI
+struct SessionSummaryView: View {
+    @ObservedObject var vm: QuizViewModel
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 16) {
+                // Headline numbers
+                let total = vm.totalAsked
+                let missed = vm.missedItems.count
+                let correct = max(0, total - missed)
+                let pct = total > 0 ? Int(round(Double(correct) * 100.0 / Double(total))) : 0
+
+                // Flag stripe
+                HStack(spacing: 0) { AppTheme.flagBlue; AppTheme.flagYellow }
+                    .frame(height: 8)
+                    .mask(RoundedRectangle(cornerRadius: 6))
+                    .padding(.top, 6)
+
+                Text("Session Summary")
+                    .font(.largeTitle).fontWeight(.bold)
+
+                HStack(spacing: 20) {
+                    summaryStat(title: "Accuracy", value: "\(pct)%")
+                    summaryStat(title: "Correct",  value: "\(correct)")
+                    summaryStat(title: "Total",    value: "\(total)")
+                }
+                .padding(.vertical, 4)
+
+                if missed > 0 {
+                    // Missed list
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Missed Words").font(.headline)
+                        List(vm.missedItems) { item in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.word).font(.headline)
+                                Text("\(item.meaning) • \(item.gender.capitalized)")
+                                    .foregroundColor(.secondary)
+                                    .font(.subheadline)
+                            }
+                        }
+                        .listStyle(.insetGrouped)
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        Text("Perfect! 🎉").font(.title2)
+                        Text("You didn’t miss any words this time.")
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                }
+
+                Spacer()
+
+                // Actions
+                VStack(spacing: 10) {
+                    if !vm.missedItems.isEmpty {
+                        Button {
+                            vm.retryMissedOnly()
+                            dismiss()
+                        } label: {
+                            Text("Retry missed only")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(AppTheme.softBlue)
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.flagBlue, lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+
+                    Button {
+                        vm.startNewSessionFromFilters()
+                        dismiss()
+                    } label: {
+                        Text("Start new session")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(AppTheme.softYellow)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(AppTheme.flagYellow, lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            }
+            .padding()
+            .navigationTitle("Summary")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func summaryStat(title: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value).font(.system(size: 28, weight: .bold))
+            Text(title).font(.footnote).foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 12).fill(AppTheme.softBlue)
+        )
     }
 }
 
 struct CategoryGrid: View {
     @ObservedObject var vm: QuizViewModel
+
     var body: some View {
         let columns = [GridItem(.adaptive(minimum: 110), spacing: 8)]
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(vm.allCategories, id: \.self) { cat in
-                let selected = vm.settings.activeCategories.contains(cat)
-                Button {
-                    var set = vm.settings.activeCategories
-                    if selected { set.remove(cat) } else { set.insert(cat) }
-                    vm.settings.activeCategories = set
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        Text(cat).lineLimit(1).minimumScaleFactor(0.8)
+                // Binding that reflects membership in the Set
+                let isSelected = Binding<Bool>(
+                    get: { vm.activeCategories.contains(cat) },
+                    set: { newValue in
+                        if newValue { vm.activeCategories.insert(cat) }
+                        else { vm.activeCategories.remove(cat) }
+                        vm.persistCategories()
+                        vm.rebuildWorkingDeck()
+                        vm.ensureStateAndStart()
+                        print("Active categories now:", vm.activeCategories.sorted()) // debug
                     }
-                    .padding(.vertical, 8).padding(.horizontal, 10)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(selected ? AppTheme.softBlue : Color(.systemBackground))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(selected ? AppTheme.flagBlue : Color.secondary.opacity(0.25), lineWidth: 1)
-                    )
-                }
+                )
+
+                CategoryChip(title: cat, isSelected: isSelected)
             }
         }
         .padding(.vertical, 4)
     }
 }
+
+struct CategoryChip: View {
+    let title: String
+    @Binding var isSelected: Bool
+
+    var body: some View {
+        Button {
+            isSelected.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                Text(title).lineLimit(1).minimumScaleFactor(0.8)
+            }
+            .padding(.vertical, 8).padding(.horizontal, 10)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? AppTheme.softBlue : Color(.systemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? AppTheme.flagBlue : Color.secondary.opacity(0.25), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 
 // MARK: - Main Quiz UI
 struct ContentView: View {
@@ -799,16 +1025,26 @@ struct ContentView: View {
             SettingsView(vm: viewModel)
                 .presentationDetents([.medium, .large])
         }
+            
+        .sheet(isPresented: $viewModel.showSummary) {
+            SessionSummaryView(vm: viewModel)
+                .presentationDetents([.large])
+        }
     }
 }
 
 // MARK: - App Entry
 @main
 struct UkrainianGendersApp: App {
+    init() {
+        AudioSetup.configureForTTS()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView(viewModel: QuizViewModel())
         }
     }
 }
+
 
